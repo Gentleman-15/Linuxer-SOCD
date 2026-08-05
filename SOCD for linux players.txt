@@ -1,0 +1,211 @@
+MADE BY: THE GENTLEMAN 
+
+SOCD Linuxer © 2026 by .the_gentleman. is licensed under Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International
+
+
+Step 1: Install Required Dependencies
+
+Open your Linux terminal and install the Python input libraries by running: 
+
+
+pip install evdev
+
+
+
+(Note: If your system uses a managed environment, use 
+
+
+sudo apt install python3-evdev 
+
+
+or 
+
+
+sudo pacman -S python-evdev 
+
+
+instead).
+
+
+Step 2: Create the Linux SOCD Script
+
+Create a new file named 
+
+
+linux_socd.py
+
+
+in your home folder and paste this code:
+
+
+#!/usr/bin/env python3
+import sys
+import os
+import signal
+from evdev import InputDevice, UInput, ecodes, list_devices
+
+# 1. Automatic Keyboard Search Loop
+devices = [InputDevice(path) for path in list_devices()]
+keyboard = None
+
+print("Available input devices:")
+for i, dev in enumerate(devices):
+    print(f"[{i}]: {dev.name} ({dev.path})")
+    if "keyboard" in dev.name.lower():
+        keyboard = dev
+
+if not keyboard:
+    print("\nCould not auto-detect keyboard device. Please choose manually:")
+    idx = int(input("Enter device index number: "))
+    keyboard = devices[idx]
+
+print(f"\nIntercepting and cleaning SOCD on: {keyboard.name}")
+print("Press F2 to toggle background SOCD on/off.")
+print("Press F4 or Ctrl+C to terminate script safely.")
+
+# Master state toggle (1 = Active, 0 = Bypassed/Paused)
+script_active = 1
+
+# Key Tracking States
+held = {
+    ecodes.KEY_LEFT: False,
+    ecodes.KEY_RIGHT: False,
+    ecodes.KEY_UP: False,
+    ecodes.KEY_DOWN: False
+}
+
+opposites = {
+    ecodes.KEY_LEFT: ecodes.KEY_RIGHT,
+    ecodes.KEY_RIGHT: ecodes.KEY_LEFT,
+    ecodes.KEY_UP: ecodes.KEY_DOWN,
+    ecodes.KEY_DOWN: ecodes.KEY_UP
+}
+
+# 3. Create virtual device frame capabilities hook
+capabilities = keyboard.capabilities()
+if ecodes.EV_KEY in capabilities:
+    for key in [ecodes.KEY_LEFT, ecodes.KEY_RIGHT, ecodes.KEY_UP, ecodes.KEY_DOWN]:
+        if key not in capabilities[ecodes.EV_KEY]:
+            capabilities[ecodes.EV_KEY].append(key)
+
+# 4. Exclusive capture driver frame loop
+try:
+    vdev = UInput(capabilities, name="Linux-SOCD-Cleaner")
+    keyboard.grab() # Exclusively locks physical device inputs
+    
+    for event in keyboard.read_loop():
+        if event.type == ecodes.EV_KEY:
+            code = event.code
+            val = event.value # 1 = Down, 0 = Up, 2 = Repeat
+            
+            # Hotkey System Interceptions
+            if val == 1:
+                if code == ecodes.KEY_F2:
+                    script_active = 0 if script_active == 1 else 1
+                    print(f"SOCD Active State: {script_active}")
+                    continue
+                elif code == ecodes.KEY_F4:
+                    print("F4 Pressed. Terminating script safely...")
+                    break
+
+            # Process directional arrow keys if SOCD is active
+            if script_active == 1 and code in held:
+                opp = opposites[code]
+                
+                if val == 1: # Key Pressed down
+                    held[code] = True
+                    if held[opp]:
+                        vdev.write(ecodes.EV_KEY, opp, 0) # Instantly drop opposite key
+                    vdev.write(ecodes.EV_KEY, code, 1)
+                    
+                elif val == 0: # Key Released up
+                    held[code] = False
+                    vdev.write(ecodes.EV_KEY, code, 0)
+                    if held[opp]:
+                        vdev.write(ecodes.EV_KEY, opp, 1) # Instantly resume held key
+                        
+                vdev.syn()
+            else:
+                # Pass all other unmapped keys or paused states through cleanly
+                if event.type != ecodes.EV_SYN:
+                    vdev.write(event.type, event.code, event.value)
+                    vdev.syn()
+
+except KeyboardInterrupt:
+    print("\nExiting and safely returning input devices back to normal...")
+finally:
+    try:
+        keyboard.ungrab() # Safety unlock step
+    except:
+        pass
+
+
+Step 3: Start the SOCD script 
+
+now open the terminal and launch it with this command:
+
+
+
+sudo python3 /home/aronp/linux_socd.py
+
+
+and now ure set. 
+
+
+IF ISSUES ARRISE:
+
+Step 1: Clean and Rewrite the File
+
+Run this command to completely overwrite the file and ensure Linux treats it purely as a standalone Python file:
+
+
+nano /home/(username)/linux_socd.py
+
+
+
+Delete any text currently inside that file, copy the complete Linux Python script provided in the previous message, paste it into the window, and save it by pressing Ctrl+O, then Enter, and exit using Ctrl+X.
+
+Step 2: Run with the Direct Path Flag
+
+To force Python to execute the file directly as a script without looking for internal modules, add a simple dot-slash (./) to your execution command:
+
+cd /home/(username)
+
+
+sudo python3 ./linux_socd.py
+
+
+
+Open your script with 
+
+
+nano /home/(username)/linux_socd.py, 
+
+
+wipe the old contents, and insert the code again.
+
+
+Save the text, exit nano, and launch it directly using:
+
+
+sudo python3 /home/aronp/linux_socd.py
+
+
+
+
+🚀 How to Start It
+
+Every time you want to play, open your Linux terminal and run the startup command: 
+sudo python3 /home/aronp/linux_socd.py
+
+
+When the list of input devices appears on your screen:Type 18 (or 17) and press Enter to bind the script to your ASUS keyboard.The script will output a confirmation text message, and your perfect opposite overrides are immediately active across your arrow keys in the background.
+
+⏸️ How to Pause It
+
+When you need to use your arrow keys normally (like navigating text fields or menus outside of Rain World):Press the F2 key on your keyboard.The terminal will print out: SOCD Active State: 0Your arrow keys will immediately return to standard Linux behavior, allowing them to overlap or lock normally.
+ Press F2 again to turn the SOCD filter right back on (SOCD Active State: 1).
+
+🛑 How to End It
+
+When you are completely finished gaming and want to turn off the script entirely:Press the F4 key on your keyboard.Alternatively, you can go to your terminal window and press Ctrl + C.The application will immediately close, release the hardware driver lock safely, and vanish from your background processes.
